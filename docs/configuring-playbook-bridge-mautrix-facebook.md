@@ -1,8 +1,20 @@
-# Setting up Mautrix Facebook (optional)
+# Setting up Mautrix Facebook bridging (optional, deprecated)
+
+**Note**: This bridge has been deprecated in favor of the [mautrix-meta](https://github.com/mautrix/meta) Messenger/Instagram bridge, which can be installed using [this playbook](configuring-playbook-bridge-mautrix-meta-messenger.md). Consider using that bridge instead of this one.
 
 The playbook can install and configure [mautrix-facebook](https://github.com/mautrix/facebook) for you.
 
 See the project's [documentation](https://github.com/mautrix/facebook/blob/master/ROADMAP.md) to learn what it does and why it might be useful to you.
+
+## Prerequisite (optional)
+
+If you want to set up [Double Puppeting](https://docs.mau.fi/bridges/general/double-puppeting.html) (hint: you most likely do) for this bridge automatically, you need to have enabled [Shared Secret Auth](configuring-playbook-shared-secret-auth.md) for this playbook.
+
+For details about configuring Double Puppeting for this bridge, see the section below: [Set up Double Puppeting](#-set-up-double-puppeting)
+
+## Adjusting the playbook configuration
+
+To enable the bridge, add the following configuration to your `inventory/host_vars/matrix.example.com/vars.yml` file:
 
 ```yaml
 matrix_mautrix_facebook_enabled: true
@@ -11,6 +23,7 @@ matrix_mautrix_facebook_enabled: true
 There are some additional things you may wish to configure about the bridge before you continue.
 
 Encryption support is off by default. If you would like to enable encryption, add the following to your `vars.yml` file:
+
 ```yaml
 matrix_mautrix_facebook_configuration_extension_yaml: |
   bridge:
@@ -20,11 +33,12 @@ matrix_mautrix_facebook_configuration_extension_yaml: |
 ```
 
 If you would like to be able to administrate the bridge from your account it can be configured like this:
+
 ```yaml
 matrix_mautrix_facebook_configuration_extension_yaml: |
   bridge:
     permissions:
-      '@YOUR_USERNAME:{{ matrix_domain }}': admin
+      '@alice:{{ matrix_domain }}': admin
 ```
 
 Using both would look like
@@ -33,54 +47,60 @@ Using both would look like
 matrix_mautrix_facebook_configuration_extension_yaml: |
   bridge:
     permissions:
-      '@YOUR_USERNAME:{{ matrix_domain }}': admin
+      '@alice:{{ matrix_domain }}': admin
     encryption:
       allow: true
       default: true
 ```
 
-You may wish to look at `roles/matrix-bridge-mautrix-facebook/templates/config.yaml.j2` and `roles/matrix-bridge-mautrix-facebook/defaults/main.yml` to find other things you would like to configure.
+You may wish to look at `roles/custom/matrix-bridge-mautrix-facebook/templates/config.yaml.j2` and `roles/custom/matrix-bridge-mautrix-facebook/defaults/main.yml` to find other things you would like to configure.
 
+## Installing
 
-## Set up Double Puppeting
+After configuring the playbook, run it with [playbook tags](playbook-tags.md) as below:
 
-If you'd like to use [Double Puppeting](https://docs.mau.fi/bridges/general/double-puppeting.html) (hint: you most likely do), you have 2 ways of going about it.
-
-### Method 1: automatically, by enabling Shared Secret Auth
-
-The bridge will automatically perform Double Puppeting if you enable [Shared Secret Auth](configuring-playbook-shared-secret-auth.md) for this playbook.
-
-This is the recommended way of setting up Double Puppeting, as it's easier to accomplish, works for all your users automatically, and has less of a chance of breaking in the future.
-
-### Method 2: manually, by asking each user to provide a working access token
-
-**Note**: This method for enabling Double Puppeting can be configured only after you've already set up bridging (see [Usage](#usage)).
-
-When using this method, **each user** that wishes to enable Double Puppeting needs to follow the following steps:
-
-- retrieve a Matrix access token for yourself. You can use the following command:
-
-```
-curl \
---data '{"identifier": {"type": "m.id.user", "user": "YOUR_MATRIX_USERNAME" }, "password": "YOUR_MATRIX_PASSWORD", "type": "m.login.password", "device_id": "Mautrix-Facebook", "initial_device_display_name": "Mautrix-Facebook"}' \
-https://matrix.DOMAIN/_matrix/client/r0/login
+<!-- NOTE: let this conservative command run (instead of install-all) to make it clear that failure of the command means something is clearly broken. -->
+```sh
+ansible-playbook -i inventory/hosts setup.yml --tags=setup-all,ensure-matrix-users-created,start
 ```
 
-- send the access token to the bot. Example: `login-matrix MATRIX_ACCESS_TOKEN_HERE`
+**Notes**:
 
-- make sure you don't log out the `Mautrix-Facebook` device some time in the future, as that would break the Double Puppeting feature
+- The `ensure-matrix-users-created` playbook tag makes the playbook automatically create the bot's user account.
 
+- The shortcut commands with the [`just` program](just.md) are also available: `just install-all` or `just setup-all`
+
+  `just install-all` is useful for maintaining your setup quickly ([2x-5x faster](../CHANGELOG.md#2x-5x-performance-improvements-in-playbook-runtime) than `just setup-all`) when its components remain unchanged. If you adjust your `vars.yml` to remove other components, you'd need to run `just setup-all`, or these components will still remain installed.
 
 ## Usage
 
-You then need to start a chat with `@facebookbot:YOUR_DOMAIN` (where `YOUR_DOMAIN` is your base domain, not the `matrix.` domain).
+To use the bridge, you need to start a chat with `@facebookbot:example.com` (where `example.com` is your base domain, not the `matrix.` domain).
 
 Send `login YOUR_FACEBOOK_EMAIL_ADDRESS` to the bridge bot to enable bridging for your Facebook Messenger account. You can learn more here about authentication from the bridge's [official documentation on Authentication](https://docs.mau.fi/bridges/python/facebook/authentication.html).
 
 If you run into trouble, check the [Troubleshooting](#troubleshooting) section below.
 
-After successfully enabling bridging, you may wish to [set up Double Puppeting](#set-up-double-puppeting), if you haven't already done so.
+### 💡 Set up Double Puppeting
 
+After successfully enabling bridging, you may wish to set up [Double Puppeting](https://docs.mau.fi/bridges/general/double-puppeting.html) (hint: you most likely do).
+
+To set it up, you have 2 ways of going about it.
+
+#### Method 1: automatically, by enabling Shared Secret Auth
+
+The bridge automatically performs Double Puppeting if [Shared Secret Auth](configuring-playbook-shared-secret-auth.md) service is configured and enabled on the server for this playbook.
+
+This is the recommended way of setting up Double Puppeting, as it's easier to accomplish, works for all your users automatically, and has less of a chance of breaking in the future.
+
+#### Method 2: manually, by asking each user to provide a working access token
+
+When using this method, **each user** that wishes to enable Double Puppeting needs to follow the following steps:
+
+- retrieve a Matrix access token for yourself. Refer to the documentation on [how to obtain one](obtaining-access-tokens.md).
+
+- send the access token to the bot. Example: `login-matrix MATRIX_ACCESS_TOKEN_HERE`
+
+- make sure you don't log out the `Mautrix-Facebook` device some time in the future, as that would break the Double Puppeting feature
 
 ## Troubleshooting
 
@@ -94,8 +114,8 @@ The easiest way to do this may be to use [sshuttle](https://sshuttle.readthedocs
 
 Example command for proxying your traffic through the Matrix server:
 
-```
-sshuttle -r root@matrix.DOMAIN:22 0/0
+```sh
+sshuttle -r root@matrix.example.com:22 0/0
 ```
 
 Once connected, you should be able to verify that you're browsing the web through the Matrix server's IP by checking [icanhazip](https://icanhazip.com/).
@@ -104,4 +124,4 @@ Then proceed to log in to [Facebook/Messenger](https://www.facebook.com/).
 
 Once logged in, proceed to [set up bridging](#usage).
 
-If that doesn't work, enable 2FA [Facebook help page on enabling 2FA](https://www.facebook.com/help/148233965247823) and try to login again with a new password, and entering the 2FA code when prompted, it may take more then one try, in between attempts, check facebook.com to see if they are requiring another password change
+If that doesn't work, enable 2FA (see: [Facebook help page on enabling 2FA](https://www.facebook.com/help/148233965247823)) and try to login again with a new password, and entering the 2FA code when prompted, it may take more then one try, in between attempts, check facebook.com to see if they are requiring another password change

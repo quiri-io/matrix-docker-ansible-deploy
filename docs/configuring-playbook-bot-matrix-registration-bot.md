@@ -2,47 +2,23 @@
 
 The playbook can install and configure [matrix-registration-bot](https://github.com/moan0s/matrix-registration-bot) for you.
 
-The bot allows you to easily **create and manage registration tokens**. It can be used for an invitation-based server,
-where you invite someone by sending them a registration token. They can register as normal but have to provide a valid
-registration token in a final step  of the registration.
+The bot allows you to easily **create and manage registration tokens** aka. invitation codes. It can be used for an invitation-based server, where you invite someone by sending them a registration token (tokens look like this: `rbalQ0zkaDSRQCOp`). They can register as per normal but have to provide a valid registration token in the final step of the registration process.
 
-See the project's [documentation](https://github.com/moan0s/matrix-registration-bot#supported-commands) to learn what it
-does and why it might be useful to you.
-
-
-## Registering the bot user
-
-By default, the playbook will set use the bot with a username like this: `@bot.matrix-registration-bot:DOMAIN`.
-
-(to use a different username, adjust the `matrix_bot_matrix_registration_bot_matrix_user_id_localpart` variable).
-
-You **need to register the bot user manually** before setting up the bot. You can use the playbook to [register a new user](registering-users.md):
-
-```
-ansible-playbook -i inventory/hosts setup.yml --extra-vars='username=bot.matrix-registration-bot password=PASSWORD_FOR_THE_BOT admin=yes' --tags=register-user
-```
-
-Choose a strong password for the bot. You can generate a good password with a command like this: `pwgen -s 64 1`.
-
-## Obtaining an admin access token
-
-In order to use the bot you need to add an admin user's access token token to the configuration. As you created an admin user for the
-bot, it is recommended to obtain an access token by logging into Element/Schildichat with the bot account
-(using the password you set) and navigate to `Settings->Help&About` and scroll to the bottom.
-You can expand "Access token" to copy it.
-
-![Obatining an admin access token with Element](assets/obtain_admin_access_token_element.png)
-
-**IMPORTANT**: once you copy the token, just close the Matrix client window/tab. Do not "log out", as that would invalidate the token.
+See the project's [documentation](https://github.com/moan0s/matrix-registration-bot/blob/master/README.md) to learn what it does and why it might be useful to you.
 
 ## Adjusting the playbook configuration
 
-Add the following configuration to your `inventory/host_vars/matrix.DOMAIN/vars.yml` file:
+To enable the bot, add the following configuration to your `inventory/host_vars/matrix.example.com/vars.yml` file:
 
 ```yaml
 matrix_bot_matrix_registration_bot_enabled: true
-# Token obtained via logging into the bot account (see above)
-matrix_bot_matrix_registration_bot_bot_access_token: "syt_bW9hbm9z_XXXXXXXXXXXXXr_2kuzbE"
+
+# By default, the playbook will set use the bot with a username like this: `@bot.matrix-registration-bot:example.com`.
+# Uncomment and adjust this part if you'd like to use a username different than the default
+# matrix_bot_matrix_registration_bot_matrix_user_id_localpart: bot.matrix-registration-bot
+
+# Generate a strong password for the bot. You can create one with a command like `pwgen -s 64 1`.
+matrix_bot_matrix_registration_bot_bot_password: PASSWORD_FOR_THE_BOT
 
 # Enables registration
 matrix_synapse_enable_registration: true
@@ -51,22 +27,39 @@ matrix_synapse_enable_registration: true
 matrix_synapse_registration_requires_token: true
 ```
 
+The bot account will be created automatically.
 
 ## Installing
 
-After configuring the playbook, run the [installation](installing.md) command again:
+After configuring the playbook, run it with [playbook tags](playbook-tags.md) as below:
 
-```
-ansible-playbook -i inventory/hosts setup.yml --tags=setup-all,start
+<!-- NOTE: let this conservative command run (instead of install-all) to make it clear that failure of the command means something is clearly broken. -->
+```sh
+ansible-playbook -i inventory/hosts setup.yml --tags=setup-all,ensure-matrix-users-created,start
 ```
 
+**Notes**:
+
+- The `ensure-matrix-users-created` playbook tag makes the playbook automatically create the bot's user account.
+
+- The shortcut commands with the [`just` program](just.md) are also available: `just install-all` or `just setup-all`
+
+  `just install-all` is useful for maintaining your setup quickly ([2x-5x faster](../CHANGELOG.md#2x-5x-performance-improvements-in-playbook-runtime) than `just setup-all`) when its components remain unchanged. If you adjust your `vars.yml` to remove other components, you'd need to run `just setup-all`, or these components will still remain installed.
+
+- If you change the bot password (`matrix_bot_matrix_registration_bot_bot_password` in your `vars.yml` file) subsequently, the bot user's credentials on the homeserver won't be updated automatically. If you'd like to change the bot user's password, use a tool like [synapse-admin](configuring-playbook-synapse-admin.md) to change it, and then update `matrix_bot_matrix_registration_bot_bot_password` to let the bot know its new password.
 
 ## Usage
 
-To use the bot, create a **non-encrypted** room and invite `@bot.matrix-registration-bot:DOMAIN` (where `YOUR_DOMAIN` is your base domain, not the `matrix.` domain).
+To use the bot, start a chat with `@bot.matrix-registration-bot:example.com` (where `example.com` is your base domain, not the `matrix.` domain).
 
-In this room send `help` and the bot will reply with all options.
+Send `help` to the bot to see the available commands.
 
 You can also refer to the upstream [Usage documentation](https://github.com/moan0s/matrix-registration-bot#supported-commands).
-If you have any questions, or if you need help setting it up, read the [troublshooting guide](https://github.com/moan0s/matrix-registration-bot/blob/main/docs/troubleshooting.md)
-or join [#matrix-registration-bot:hyteck.de](https://matrix.to/#/#matrix-registration-bot:hyteck.de).
+
+If you have any questions, or if you need help setting it up, read the [troublshooting guide](https://github.com/moan0s/matrix-registration-bot/blob/main/docs/troubleshooting.md) or join [#matrix-registration-bot:hyteck.de](https://matrix.to/#/#matrix-registration-bot:hyteck.de).
+
+To clean the cache (session & encryption data) after you changed the bot's username, changed the login method from access_token to password etc… you can use:
+
+```sh
+just run-tags bot-matrix-registration-bot-clean-cache
+```
